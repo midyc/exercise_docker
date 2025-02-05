@@ -47,6 +47,6 @@ jobs:
           name: code
           path: .
       - name: build docker
-        run: bash ci/build-docker.sh
+        run: bash ci/build-docker.sh ${{ env.SHORT_SHA }}
       - name: push docker
-        run: bash ci/push-docker.sh
+        run: bash ci/push-docker.sh ${{ env.SHORT_SHA }}
