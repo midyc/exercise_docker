@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
-echo "${{ github.sha }}"
-[[ -z "${{ github.sha }}" ]] && Tag='local' || Tag="${ github.sha::8}"
+[[ -z "${COMMIT_SHA}" ]] && Tag='local' || Tag="${COMMIT_SHA::8}" 
 REPO="ghcr.io/$docker_username/"
 echo "${REPO}"
 docker build -t "${REPO}micronaut-app:latest" -t "${REPO}micronaut-app:1.0-$Tag" app/
