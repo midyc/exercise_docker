@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+COMMIT_SHA=$1
 [[ -z "${COMMIT_SHA}" ]] && Tag='local' || Tag="${COMMIT_SHA::8}" 
 REPO="ghcr.io/$docker_username/"
 echo "${REPO}"
