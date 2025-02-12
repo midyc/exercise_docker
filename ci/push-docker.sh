@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
-Tag='local'
-echo "${env.GIT_COMMIT}"
+COMMIT_SHA=$1
 echo "$docker_password" | docker login ghcr.io --username "$docker_username" --password-stdin
-docker push "ghcr.io/$docker_username/micronaut-app:1.0-${env.GIT_COMMIT::8}$Tag" 
+docker push "ghcr.io/$docker_username/micronaut-app:1.0-$COMMIT_SHA" 
 docker push "ghcr.io/$docker_username/micronaut-app:latest" &
 wait
+
 
 # set -e
 # [[ -z "${GIT_COMMIT}" ]] && Tag='local' || Tag="${GIT_COMMIT::8}" 
