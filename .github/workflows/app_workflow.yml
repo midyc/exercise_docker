@@ -1,0 +1,145 @@
+name: CI/CD - WebForms
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/app2_workflow.yaml'
+      - 'WebApplication2/**'
+    branches:
+      - main
+      - develop
+      - staging
+      - 'features/**'
+      - 'pipe/**'
+
+env:
+  SOLUTION_PATH: '.\WebApplication2\WebApplication2.sln'
+  BUILD_CONFIG: 'Release'
+  PLATFORM: Any Cpu
+  DOTNET_VERSION: '4.7.2'
+  PUBLISH_OUTPUT_PATH: 'published'
+  ARTIFACT_NAME: 'application'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Nuget
+      uses: nuget/setup-nuget@v1
+      with:
+        nuget-version: 'latest'
+
+    - name: Setup MSBUILD
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Restore packages 
+      run: nuget restore ${{ env.SOLUTION_PATH }} -Verbosity Detailed -NonInteractive
+
+    - name: MSBuild
+      run: |
+        msbuild ${{ env.SOLUTION_PATH }} /nologo /nr:false /p:DeployOnBuild=true /p:OutputPath="output" /p:WebProjectOutputDir="..\${{ env.PUBLISH_OUTPUT_PATH }}" /p:platform="${{ env.PLATFORM }}" /p:configuration="${{ env.BUILD_CONFIG }}"
+
+    - name: Publish Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.ARTIFACT_NAME }}
+        path: .\WebApplication2\${{ env.PUBLISH_OUTPUT_PATH }}
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: DEV
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.workflow_run.head_branch }}
+
+    - name: Deploy DEV
+      uses: ./.github/templates
+      with:
+        resource_group: ${{ vars.RESOURCE_GROUP }}
+        web_app_name: ${{ vars.WEB_APP_NAME_2 }}
+        artifact_name: ${{ env.ARTIFACT_NAME }}
+        azure_credentials: '${{ secrets.AZURE_CREDENTIALS }}'
+
+  deploy-qa:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/staging'
+    environment: QA
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.workflow_run.head_branch }}
+
+    - name: Deploy QA
+      uses: ./.github/templates
+      with:
+        resource_group: ${{ vars.RESOURCE_GROUP }}
+        web_app_name: ${{ vars.WEB_APP_NAME_2 }}
+        artifact_name: ${{ env.ARTIFACT_NAME }}
+        azure_credentials: '${{ secrets.AZURE_CREDENTIALS }}'
+
+  deploy-prd:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: PRD
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.workflow_run.head_branch }}
+
+    - name: Deploy PRD
+      uses: ./.github/templates
+      with:
+        resource_group: ${{ vars.RESOURCE_GROUP }}
+        web_app_name: ${{ vars.WEB_APP_NAME_2 }}
+        artifact_name: ${{ env.ARTIFACT_NAME }}
+        azure_credentials: '${{ secrets.AZURE_CREDENTIALS }}'
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: deploy-prd
+    steps:
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+      with:
+        tag_name: ${{ github.run_number }}
+        release_name: Release ${{ github.run_number }}
+        draft: false
+        prerelease: false
+
+    - name: Download Artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: ${{ env.artifact_name }}
+        
+    - name: Zip package
+      shell: bash
+      run: | 
+        zip -r ./${{ env.ARTIFACT_NAME }} .
+        
+    - name: upload windows artifact
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./${{ env.ARTIFACT_NAME }}.zip
+        asset_name: ${{ env.ARTIFACT_NAME }}.zip
+        asset_content_type: application/zip

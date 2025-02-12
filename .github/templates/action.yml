@@ -1,0 +1,34 @@
+name: Deploy Azure WebApp
+
+inputs:
+  resource_group:
+    required: true
+  web_app_name:
+    required: true
+  artifact_name:
+    required: true
+  azure_credentials:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+  - name: Download Artifact
+    uses: actions/download-artifact@v2
+    with:
+      name: ${{ env.artifact_name }}
+      
+  - name: Zip package
+    shell: bash
+    run: | 
+      zip -r ./${{ inputs.artifact_name }} ./${{ inputs.artifact_name }}
+
+  - name: Login to Azure
+    uses: azure/login@v1
+    with:
+      creds: '${{ inputs.azure_credentials }}'
+
+  - name: Deploy WebApp
+    shell: bash
+    run: |
+      az webapp deployment source config-zip --src ./${{ inputs.artifact_name }}.zip --resource-group ${{ inputs.resource_group }} --name ${{ inputs.web_app_name }}
